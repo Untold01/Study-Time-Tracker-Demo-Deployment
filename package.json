@@ -1,0 +1,13 @@
+
+{
+  "name": "study-tracker-app",
+  "version": "1.0.0",
+  "scripts": {
+    "install": "npm install --prefix server && npm install --prefix client",
+    "build": "npm run build --prefix client",
+    "start": "node server/index.js"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
