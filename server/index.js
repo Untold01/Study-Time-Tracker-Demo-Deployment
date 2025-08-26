@@ -1,4 +1,5 @@
-// index.js (Updated)
+import path from "path";
+import { fileURLToPath } from "url"
 import express from "express";
 import cors from "cors";
 import bcrypt from "bcryptjs";
@@ -7,14 +8,23 @@ import { v4 as uuidv4 } from "uuid";
 import { mockDb as db } from "./mockDb.js";
 
 const app = express();
+app.use(express.json());
+
 const PORT = process.env.PORT || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || "devsecret-change-me";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
+app.use(express.static(path.join(__dirname, "../client/build")));
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../client/build/index.html"));
+});
 const SUBJECT_COLORS = ["#93c5fd", "#86efac", "#fcd34d", "#fca5a5", "#c4b5fd", "#94a3b8"];
 
 app.use(cors({
-  origin: process.env.CLIENT_URL 
+  origin: process.env.CLIENT_URL
 }));
+
 
 // ---------- Auth Helpers (Unchanged) ----------
 function generateToken(user) {
@@ -71,29 +81,29 @@ app.post("/api/auth/login", async (req, res) => {
 
 // Create subject
 app.post("/api/subjects", auth, async (req, res) => {
-    const { name } = req.body;
-    if (!name) return res.status(400).json({ error: "Subject name is required" });
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: "Subject name is required" });
 
-    const userSubjects = await db.getSubjects(req.user.uid);
-    const colorIndex = userSubjects.length % SUBJECT_COLORS.length;
-    const color = SUBJECT_COLORS[colorIndex];
-    
-    const newSubject = await db.createSubject(req.user.uid, name, color);
-    res.status(201).json(newSubject);
+  const userSubjects = await db.getSubjects(req.user.uid);
+  const colorIndex = userSubjects.length % SUBJECT_COLORS.length;
+  const color = SUBJECT_COLORS[colorIndex];
+
+  const newSubject = await db.createSubject(req.user.uid, name, color);
+  res.status(201).json(newSubject);
 });
 
 // List subjects
 app.get("/api/subjects", auth, async (req, res) => {
-    const subjects = await db.getSubjects(req.user.uid);
-    res.json(subjects);
+  const subjects = await db.getSubjects(req.user.uid);
+  res.json(subjects);
 });
 
 // Delete subject
 app.delete("/api/subjects/:id", auth, async (req, res) => {
-    const { id } = req.params;
-    const success = await db.deleteSubject(req.user.uid, id);
-    if (!success) return res.status(404).json({ error: "Not found" });
-    res.json({ ok: true });
+  const { id } = req.params;
+  const success = await db.deleteSubject(req.user.uid, id);
+  if (!success) return res.status(404).json({ error: "Not found" });
+  res.json({ ok: true });
 });
 
 
@@ -135,9 +145,9 @@ app.get("/api/sessions", auth, async (req, res) => {
       };
     })
     .sort((a, b) => { // Mimic ORDER BY
-        if (a.date > b.date) return -1;
-        if (a.date < b.date) return 1;
-        return new Date(b.createdAt) - new Date(a.createdAt);
+      if (a.date > b.date) return -1;
+      if (a.date < b.date) return 1;
+      return new Date(b.createdAt) - new Date(a.createdAt);
     });
 
   res.json(results);
@@ -160,9 +170,9 @@ app.get("/api/stats/summary", auth, async (req, res) => {
   const sessions = await db.getSessions(req.user.uid);
 
   const filteredSessions = sessions.filter(s => {
-      if (from && s.date < from) return false;
-      if (to && s.date > to) return false;
-      return true;
+    if (from && s.date < from) return false;
+    if (to && s.date > to) return false;
+    return true;
   });
 
   // Mimic GROUP BY date and SUM(durationMinutes)
@@ -172,9 +182,9 @@ app.get("/api/stats/summary", auth, async (req, res) => {
   }, {});
 
   const days = Object.keys(dailyMinutes).map(date => ({
-      date,
-      minutes: dailyMinutes[date]
-  })).sort((a,b) => a.date.localeCompare(b.date)); // ORDER BY date ASC
+    date,
+    minutes: dailyMinutes[date]
+  })).sort((a, b) => a.date.localeCompare(b.date)); // ORDER BY date ASC
 
   const totalMinutes = filteredSessions.reduce((acc, s) => acc + s.durationMinutes, 0);
 
@@ -183,53 +193,53 @@ app.get("/api/stats/summary", auth, async (req, res) => {
 
 // Time per subject report
 app.get("/api/stats/time-per-subject", auth, async (req, res) => {
-    const sessions = await db.getSessions(req.user.uid);
-    const subjects = await db.getSubjects(req.user.uid);
-    const subjectsMap = new Map(subjects.map(s => [s.id, s]));
+  const sessions = await db.getSessions(req.user.uid);
+  const subjects = await db.getSubjects(req.user.uid);
+  const subjectsMap = new Map(subjects.map(s => [s.id, s]));
 
-    // Mimic GROUP BY subjectId and SUM(durationMinutes)
-    const subjectMinutes = sessions.reduce((acc, session) => {
-        if (session.subjectId) {
-            acc[session.subjectId] = (acc[session.subjectId] || 0) + session.durationMinutes;
-        }
-        return acc;
-    }, {});
+  // Mimic GROUP BY subjectId and SUM(durationMinutes)
+  const subjectMinutes = sessions.reduce((acc, session) => {
+    if (session.subjectId) {
+      acc[session.subjectId] = (acc[session.subjectId] || 0) + session.durationMinutes;
+    }
+    return acc;
+  }, {});
 
-    const report = Object.keys(subjectMinutes)
-        .map(subjectId => {
-            const subject = subjectsMap.get(subjectId);
-            return {
-                name: subject ? subject.name : "Unknown",
-                color: subject ? subject.color : "#94a3b8",
-                totalMinutes: subjectMinutes[subjectId]
-            }
-        })
-        .sort((a,b) => b.totalMinutes - a.totalMinutes); // ORDER BY totalMinutes DESC
-    
-    res.json(report);
+  const report = Object.keys(subjectMinutes)
+    .map(subjectId => {
+      const subject = subjectsMap.get(subjectId);
+      return {
+        name: subject ? subject.name : "Unknown",
+        color: subject ? subject.color : "#94a3b8",
+        totalMinutes: subjectMinutes[subjectId]
+      }
+    })
+    .sort((a, b) => b.totalMinutes - a.totalMinutes); // ORDER BY totalMinutes DESC
+
+  res.json(report);
 });
 
 // Study trend report for last 7 days
 app.get("/api/stats/study-trend", auth, async (req, res) => {
-    const sessions = await db.getSessions(req.user.uid);
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const sevenDaysAgoStr = sevenDaysAgo.toISOString().slice(0, 10);
+  const sessions = await db.getSessions(req.user.uid);
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const sevenDaysAgoStr = sevenDaysAgo.toISOString().slice(0, 10);
 
-    const recentSessions = sessions.filter(s => s.date >= sevenDaysAgoStr);
-    
-    // Mimic GROUP BY date and SUM(durationMinutes)
-    const trend = recentSessions.reduce((acc, session) => {
-        acc[session.date] = (acc[session.date] || 0) + session.durationMinutes;
-        return acc;
-    }, {});
+  const recentSessions = sessions.filter(s => s.date >= sevenDaysAgoStr);
 
-    const result = Object.keys(trend).map(date => ({
-        date,
-        totalMinutes: trend[date]
-    })).sort((a,b) => a.date.localeCompare(b.date)); // ORDER BY date ASC
+  // Mimic GROUP BY date and SUM(durationMinutes)
+  const trend = recentSessions.reduce((acc, session) => {
+    acc[session.date] = (acc[session.date] || 0) + session.durationMinutes;
+    return acc;
+  }, {});
 
-    res.json(result);
+  const result = Object.keys(trend).map(date => ({
+    date,
+    totalMinutes: trend[date]
+  })).sort((a, b) => a.date.localeCompare(b.date)); // ORDER BY date ASC
+
+  res.json(result);
 });
 
 
