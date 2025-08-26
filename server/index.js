@@ -12,9 +12,9 @@ const JWT_SECRET = process.env.JWT_SECRET || "devsecret-change-me";
 
 const SUBJECT_COLORS = ["#93c5fd", "#86efac", "#fcd34d", "#fca5a5", "#c4b5fd", "#94a3b8"];
 
-app.use(cors());
-app.use(express.json());
-
+app.use(cors({
+  origin: process.env.CLIENT_URL 
+}));
 
 // ---------- Auth Helpers (Unchanged) ----------
 function generateToken(user) {
