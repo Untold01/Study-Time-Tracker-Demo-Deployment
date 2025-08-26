@@ -22,7 +22,7 @@ function SideBar() {
   return (
     <div className="sidebar">
       <div>
-        <Link to="/" className="title" style={{ display: 'block', marginBottom: 32 }}>📚 Study Tracker</Link>
+        <Link to="/" className="title" style={{ display: 'block', marginBottom: 32 }}>📚 Study Time Tracker</Link>
         <nav className="sidebar-nav">
           <NavLink to="/">Dashboard</NavLink>
           <NavLink to="/subjects">Subjects</NavLink>
